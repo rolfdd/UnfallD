@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pivot mit Binärdaten</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.14.2/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.de.min.js"></script>
+    <style>
+        html, body, #map { width: 100%; height: 100%; padding: 0; margin: 0; }
+    </style>
+</head>
+<body>
+    <div id="output"></div>
+    <div id="map"></div>
+    <script>
+        const gemCode = 14612000;
+        
+        const fktBinToCsv = (bytes, longs) => {
+            const header = 'ID,Gem,Jahr,Mon,Tag,Stunde,Kat,Art,Typ,Licht,Zust,Rad,Pkw,Fuss,Krad,Lkw,Sonst,Plausi,lon,lat'.split(',');
+            const csvData = [header];
+        
+            for (let o = 0; o < bytes.length; o += 16) {
+                const li = o / 4;
+                const id    = 0;          //muss noch betuddelt werden
+                const gem   = gemCode;
+                const yy    = bytes[o+0];
+                const mm    = bytes[o+1];
+                const dd    = bytes[o+2];
+                const hh    = bytes[o+3];
+                const f1    = bytes[o+4]; //bitwise 1
+                const f2    = bytes[o+5]; //bitwise 2
+                const f3    = bytes[o+6]; //bitwise 3
+                const art   = f1 & 0x0F;
+                const typ   = (f1 >> 4) & 0x0F;
+                const kat   = f2 & 0x03;
+                const licht = (f2 >> 2) & 0x03;
+                const zust  = (f2 >> 4) & 0x03;
+                const rad   = (f3 & 1) ? 1 : 0;
+                const pkw   = (f3 & 2) ? 1 : 0;
+                const fuss  = (f3 & 4) ? 1 : 0;
+                const krad  = (f3 & 8) ? 1 : 0;
+                const lkw   = (f3 & 16) ? 1 : 0;
+                const sonst = (f3 & 32) ? 1 : 0;
+                const plst  = (f3 & 64) ? 1 : 0;
+                const lon   = longs[li+2] / 1000000;
+                const lat   = longs[li+3] / 1000000;
+        
+                csvData.push([id, gem, yy, mm, dd, hh, kat, art, typ, licht, zust, rad, pkw, fuss, krad, lkw, sonst, plst, lon, lat]);
+            }
+        
+            return csvData;
+        };
+        
+        const fktFetchBinData = (startByte, endByte) => {
+            const url = 'data/UnfallD_16-25.bin';
+            return fetch(url, { headers: { 'Range': `bytes=${startByte}-${endByte}` } })
+            .then(res => res.arrayBuffer())
+            .then(buf => ({
+                bytes: new Uint8Array(buf),
+                longs: new Int32Array(buf)
+            }));
+        };
+        
+        const fktLoadData = () => {
+            const gemURL = 'data/UnfallD_16-25_index.csv';
+            fetch(gemURL)
+            .then(res => res.text())
+            .then(fileContent => {
+                const gemList = JSON.parse('[[' + fileContent.replaceAll('\n','],[') + ']]');
+                const gemPos = gemList.findIndex(entry => entry[0] === gemCode);
+                const startByte = gemPos > 0 ? gemList[gemPos-1][1] * 16 : 0;
+                const endByte = gemList[gemPos][1] * 16 - 1;
+                return fktFetchBinData(startByte, endByte);
+            })
+            .then(({ bytes, longs }) => {
+                const csvData = fktBinToCsv(bytes, longs);
+                fktInitPivot(csvData);
+            })
+        };
+
+        const fktInitPivot = (data) => {
+            const map = L.map('map', {center: [51.05, 13.74], zoom: 15, zoomControl: false, preferCanvas: true});
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+            let group = L.featureGroup().addTo(map);
+            
+            const output = document.getElementById('output');
+            const sidebar = L.control();
+            sidebar.onAdd = () => output;
+            sidebar.addTo(map);
+
+            $("#output").pivotUI(data, {
+                rows: ["Jahr"],
+                rendererOptions: {
+                    table: {
+                        clickCallback: (e, value, filters, pivotData) => {
+                            map.removeLayer(group);
+                            group = L.featureGroup().addTo(map);
+                            let points = [];
+                            pivotData.forEachMatchingRecord(filters, (record) => {
+                                points.push([record.lat, record.lon]);
+                            });
+                            for (let i=0; i<points.length; i++) {
+                                L.circleMarker(points[i]).addTo(group);
+                            };
+                            map.fitBounds(group.getBounds());
+                        }
+                    }
+                }
+            }, false, "de");
+        };
+
+        fktLoadData();
+    </script>
+</body>
+</html>
