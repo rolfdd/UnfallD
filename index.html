@@ -17,23 +17,21 @@
     <div id="output"></div>
     <div id="map"></div>
     <script>
-        const gemCode = 14612000;
+        const gemCode = [14612000];
         
-        const fktBinToCsv = (bytes, longs) => {
-            const header = 'ID,Gem,Jahr,Mon,Tag,Stunde,Kat,Art,Typ,Licht,Zust,Rad,Pkw,Fuss,Krad,Lkw,Sonst,Plausi,lon,lat'.split(',');
-            const csvData = [header];
-        
-            for (let o = 0; o < bytes.length; o += 16) {
-                const li = o / 4;
-                const id    = 0;          //muss noch betuddelt werden
-                const gem   = gemCode;
-                const yy    = bytes[o+0];
-                const mm    = bytes[o+1];
-                const dd    = bytes[o+2];
-                const hh    = bytes[o+3];
-                const f1    = bytes[o+4]; //bitwise 1
-                const f2    = bytes[o+5]; //bitwise 2
-                const f3    = bytes[o+6]; //bitwise 3
+        const fktBinToArr = (bytes, longs) => {
+            const header = ["Gem", "Jahr", "Mon", "Tag", "Stunde", "Kat", "Art", "Typ", "Licht", "Zust", "Rad", "Pkw", "Fuss", "Krad", "Lkw", "Sonst", "Plausi", "lon", "lat"];
+            const arrData = [header];
+            for (let i = 0; i < bytes.length; i += 16) {
+                const li = i / 4;
+                const gem   = gemCode[0];
+                const yy    = bytes[i+0];
+                const mm    = bytes[i+1];
+                const dd    = bytes[i+2];
+                const hh    = bytes[i+3];
+                const f1    = bytes[i+4]; //bitwise 1
+                const f2    = bytes[i+5]; //bitwise 2
+                const f3    = bytes[i+6]; //bitwise 3
                 const art   = f1 & 0x0F;
                 const typ   = (f1 >> 4) & 0x0F;
                 const kat   = f2 & 0x03;
@@ -48,11 +46,9 @@
                 const plst  = (f3 & 64) ? 1 : 0;
                 const lon   = longs[li+2] / 1000000;
                 const lat   = longs[li+3] / 1000000;
-        
-                csvData.push([id, gem, yy, mm, dd, hh, kat, art, typ, licht, zust, rad, pkw, fuss, krad, lkw, sonst, plst, lon, lat]);
+                arrData.push([gem, yy, mm, dd, hh, kat, art, typ, licht, zust, rad, pkw, fuss, krad, lkw, sonst, plst, lon, lat]);
             }
-        
-            return csvData;
+            return arrData;
         };
         
         const fktFetchBinData = (startByte, endByte) => {
@@ -69,16 +65,17 @@
             const gemURL = 'data/UnfallD_16-25_index.csv';
             fetch(gemURL)
             .then(res => res.text())
-            .then(fileContent => {
-                const gemList = JSON.parse('[[' + fileContent.replaceAll('\n','],[') + ']]');
-                const gemPos = gemList.findIndex(entry => entry[0] === gemCode);
+            .then(csv => {
+                const gemList = JSON.parse('[[' + csv.replaceAll('\n','],[') + ']]');
+                const gemPos = gemList.findIndex(entry => entry[0] === gemCode[0]);
                 const startByte = gemPos > 0 ? gemList[gemPos-1][1] * 16 : 0;
                 const endByte = gemList[gemPos][1] * 16 - 1;
                 return fktFetchBinData(startByte, endByte);
             })
             .then(({ bytes, longs }) => {
-                const csvData = fktBinToCsv(bytes, longs);
-                fktInitPivot(csvData);
+                const arrData = fktBinToArr(bytes, longs);
+                console.log(arrData);
+                fktInitPivot(arrData);
             })
         };
 
