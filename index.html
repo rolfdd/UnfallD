@@ -81,7 +81,12 @@
 
         const fktInitPivot = (data) => {
             const map = L.map('map', {center: [51.05, 13.74], zoom: 15, zoomControl: false, preferCanvas: true});
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+                    const basemap = L.tileLayer('https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_grau/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png', {
+                className: 'map-minimal-gray',
+                maxNativeZoom: 19, 
+                maxZoom: 22,
+                attribution: '&copy; <a href="https://basemap.de/">basemap.de</a> / BKG 2026'
+            }).addTo(map);
             let group = L.featureGroup().addTo(map);
             
             const output = document.getElementById('output');
@@ -101,7 +106,7 @@
                                 points.push([record.lat, record.lon]);
                             });
                             for (let i=0; i<points.length; i++) {
-                                L.circleMarker(points[i]).addTo(group);
+                                L.circleMarker(points[i],{radius: 1, fillColor: 'red', fillOpacity: 1, stroke: false}).addTo(group);
                             };
                             map.fitBounds(group.getBounds());
                         }
