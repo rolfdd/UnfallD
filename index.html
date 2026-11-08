@@ -106,7 +106,7 @@
                                 points.push([record.lat, record.lon]);
                             });
                             for (let i=0; i<points.length; i++) {
-                                L.circleMarker(points[i],{radius: 1, fillColor: 'red', fillOpacity: 1, stroke: false}).addTo(group);
+                                L.circleMarker(points[i],{radius: 3, fillColor: 'red', fillOpacity: 1, stroke: false}).addTo(group);
                             };
                             map.fitBounds(group.getBounds());
                         }
